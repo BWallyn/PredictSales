@@ -29,7 +29,7 @@ def merge_data(data_sales, data_store, remove_outliers=False):
         # One store with a huge number of customers
         data_merged = data_merged[data_merged['Customers'] <= 6000]
         # Two stores with competition before 1980
-        data_merged = data_merged[data_merged['CompetitionOpenSinceYear'] >= 1980]
+        data_merged = data_merged[(data_merged['CompetitionOpenSinceYear'] >= 1980) | (data_merged['CompetitionOpenSinceYear'] == 0.)]
         # Two stores with competition distance >= 5000
         data_merged = data_merged[data_merged['CompetitionDistance'] <= 5000]
     return data_merged
