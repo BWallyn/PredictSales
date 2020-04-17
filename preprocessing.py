@@ -1,27 +1,5 @@
 import pandas as pd
 
-def preprocessing(data_sales, data_store):
-    convert_levels_store = {
-        'StoreType': {'a': 0, 'b': 3, 'c': 2, 'd': 1},
-        'Assortment': {'a': 0, 'b': 2, 'c': 1},
-        'PromoInterval': {'Jan,Apr,Jul,Oct': 2, 'Feb,May,Aug,Nov': 1, 'Mar,Jun,Sept,Dec': 0}
-    }
-    convert_levels_sales = {'StateHoliday': {'0': 0, 'a': 1, 'b': 2, 'c': 3}}
-    data_store.replace(convert_levels_store, inplace=True)
-    data_sales.replace(convert_levels_sales, inplace=True)
-    data_sales['year'] = pd.to_datetime(data_sales['Date'], format='%Y-%m-%d').dt.year
-    data_sales['month'] = pd.to_datetime(data_sales['Date'], format='%Y-%m-%d').dt.month
-    data_sales.drop(columns=['Date'], inplace=True)
-    # Replace NaNs
-    # competition: we consider there is no competition when NaN
-    data_store.loc[:, 'CompetitionDistance'] = data_store.loc[:, 'CompetitionDistance'].fillna(value=0.)
-    data_store.loc[:, 'CompetitionOpenSinceMonth'] = data_store.loc[:, 'CompetitionOpenSinceMonth'].fillna(value=0.)
-    data_store.loc[:, 'CompetitionOpenSinceYear'] = data_store.loc[:, 'CompetitionOpenSinceYear'].fillna(value=0.)
-    # Promo2: we consider that there is no promo when NaN
-    data_store.loc[:, 'Promo2SinceWeek'] = data_store.loc[:, 'Promo2SinceWeek'].fillna(value=0.)
-    data_store.loc[:, 'Promo2SinceYear'] = data_store.loc[:, 'Promo2SinceYear'].fillna(value=0.)
-    data_store.loc[:, 'PromoInterval'] = data_store.loc[:, 'PromoInterval'].fillna(value=0.)
-    return data_sales, data_store
 
 def merge_data(data_sales, data_store, remove_outliers=False):
     data_merged = data_sales.merge(data_store, left_on='Store', right_on='Store', how='left')
@@ -29,7 +7,58 @@ def merge_data(data_sales, data_store, remove_outliers=False):
         # One store with a huge number of customers
         data_merged = data_merged[data_merged['Customers'] <= 6000]
         # Two stores with competition before 1980
-        data_merged = data_merged[(data_merged['CompetitionOpenSinceYear'] >= 1980) | (data_merged['CompetitionOpenSinceYear'] == 0.)]
+        data_merged = data_merged[(data_merged['CompetitionOpenSinceYear'] >= 1980) | 
+                                  (data_merged['CompetitionOpenSinceYear'] == 0.)]
         # Two stores with competition distance >= 5000
         data_merged = data_merged[data_merged['CompetitionDistance'] <= 5000]
     return data_merged
+
+
+def preprocessing(data_sales, data_store, remove_outliers=False):
+    # features
+    features = []
+    # convert date to datetime
+    data_sales['Date'] = pd.to_datetime(data_sales['Date'], format='%Y-%m-%d')
+    # assume store open, if not provided
+    data_sales.fillna(1, inplace=True)
+    # consider only open stores for training. Closed stores wont count into the score
+    data_sales = data_sales[data_sales["Open"] != 0]
+    # merge sales and store
+    data = merge_data(data_sales, data_store, remove_outliers=remove_outliers )
+    # remove NaNs
+    data["CompetitionDistance"].fillna(data["CompetitionDistance"].median(), inplace=True)
+    data.fillna(0, inplace=True)
+    data.loc[data.Open.isnull(), 'Open'] = 1
+    # Use some properties directly
+    features.extend(['Store', 'CompetitionDistance', 'Promo', 'Promo2', 'SchoolHoliday'])
+    # Label encode some features
+    features.extend(['StoreType', 'Assortment', 'StateHoliday'])
+    data["StoreType"] = data["StoreType"].map({'a': 0, 'b': 3, 'c': 2, 'd': 1})
+    data["Assortment"] = data["Assortment"].map({'a': 0, 'b': 2, 'c': 1})
+    data["StateHoliday"] = data["StateHoliday"].map({0: 0, "0": 0, "a": 1, "b": 1, "c": 1})
+    features.extend(['DayOfWeek', 'Month', 'Day', 'Year', 'WeekOfYear'])
+    data['Year'] = data.Date.dt.year
+    data['Month'] = data.Date.dt.month
+    data['Day'] = data.Date.dt.day
+    data['WeekOfYear'] = data.Date.dt.weekofyear
+    # Calculate time competition open time in months
+    features.append('CompetitionOpen')
+    data['CompetitionOpen'] = 12 * (data.Year - data.CompetitionOpenSinceYear) + \
+        (data.Month - data.CompetitionOpenSinceMonth)
+    # Promo open time in months
+    features.append('PromoOpen')
+    data['PromoOpen'] = 12 * (data.Year - data.Promo2SinceYear) + (data.WeekOfYear - data.Promo2SinceWeek) / 4.0
+    data['PromoOpen'] = data.PromoOpen.apply(lambda x: x if x > 0 else 0)
+    data.loc[data.Promo2SinceYear == 0, 'PromoOpen'] = 0
+    # Indicate that sales on that day are in promo interval
+    features.append('IsPromoMonth')
+    month2str = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                 7: 'Jul', 8: 'Aug', 9: 'Sept', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+    data['monthStr'] = data.Month.map(month2str)
+    data.loc[data.PromoInterval == 0, 'PromoInterval'] = ''
+    data['IsPromoMonth'] = 0
+    for interval in data.PromoInterval.unique():
+        if interval != '':
+            for month in interval.split(','):
+                data.loc[(data.monthStr == month) & (data.PromoInterval == interval), 'IsPromoMonth'] = 1
+    return data, features
