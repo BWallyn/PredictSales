@@ -9,7 +9,7 @@ def rmse(y_true, y_pred):
 def rmse_XGBoost(y_pred, y_true):
     y_true = y_true.get_label()
     y_pred = y_pred
-    return "rmse", rmse(y_true, y_pred)
+    return 'rmse', rmse(y_true, y_pred)
 
 
 def create_feature_map(features, feature_map_path):

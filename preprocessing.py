@@ -22,20 +22,20 @@ def preprocessing(data_sales, data_store, remove_outliers=False):
     # assume store open, if not provided
     data_sales.fillna(1, inplace=True)
     # consider only open stores for training. Closed stores wont count into the score
-    data_sales = data_sales[data_sales["Open"] != 0]
+    data_sales = data_sales[data_sales['Open'] != 0]
     # merge sales and store
-    data = merge_data(data_sales, data_store, remove_outliers=remove_outliers )
+    data = merge_data(data_sales, data_store, remove_outliers=remove_outliers)
     # remove NaNs
-    data["CompetitionDistance"].fillna(data["CompetitionDistance"].median(), inplace=True)
+    data['CompetitionDistance'].fillna(data['CompetitionDistance'].median(), inplace=True)
     data.fillna(0, inplace=True)
     data.loc[data.Open.isnull(), 'Open'] = 1
     # Use some properties directly
     features.extend(['Store', 'CompetitionDistance', 'Promo', 'Promo2', 'SchoolHoliday'])
     # Label encode some features
     features.extend(['StoreType', 'Assortment', 'StateHoliday'])
-    data["StoreType"] = data["StoreType"].map({'a': 0, 'b': 3, 'c': 2, 'd': 1})
-    data["Assortment"] = data["Assortment"].map({'a': 0, 'b': 2, 'c': 1})
-    data["StateHoliday"] = data["StateHoliday"].map({0: 0, "0": 0, "a": 1, "b": 1, "c": 1})
+    data['StoreType'] = data['StoreType'].map({'a': 0, 'b': 3, 'c': 2, 'd': 1})
+    data['Assortment'] = data['Assortment'].map({'a': 0, 'b': 2, 'c': 1})
+    data['StateHoliday'] = data['StateHoliday'].map({0: 0, '0': 0, 'a': 1, 'b': 1, 'c': 1})
     features.extend(['DayOfWeek', 'Month', 'Day', 'Year', 'WeekOfYear'])
     data['Year'] = data.Date.dt.year
     data['Month'] = data.Date.dt.month
@@ -50,15 +50,4 @@ def preprocessing(data_sales, data_store, remove_outliers=False):
     data['PromoOpen'] = 12 * (data.Year - data.Promo2SinceYear) + (data.WeekOfYear - data.Promo2SinceWeek) / 4.0
     data['PromoOpen'] = data.PromoOpen.apply(lambda x: x if x > 0 else 0)
     data.loc[data.Promo2SinceYear == 0, 'PromoOpen'] = 0
-    # Indicate that sales on that day are in promo interval
-    features.append('IsPromoMonth')
-    month2str = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-                 7: 'Jul', 8: 'Aug', 9: 'Sept', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
-    data['monthStr'] = data.Month.map(month2str)
-    data.loc[data.PromoInterval == 0, 'PromoInterval'] = ''
-    data['IsPromoMonth'] = 0
-    for interval in data.PromoInterval.unique():
-        if interval != '':
-            for month in interval.split(','):
-                data.loc[(data.monthStr == month) & (data.PromoInterval == interval), 'IsPromoMonth'] = 1
     return data, features
