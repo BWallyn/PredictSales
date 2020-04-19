@@ -1,0 +1,7 @@
+numpy
+pandas
+seaborn >= 0.10
+matplotlib.pyplot
+xgboost
+operator
+scikit-learn
