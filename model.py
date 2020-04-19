@@ -12,6 +12,11 @@ def rmse_XGBoost(y_pred, y_true):
     return 'rmse', rmse(y_true, y_pred)
 
 
+def mae(y_true, y_pred):
+    loss = np.mean(np.abs(y_true - y_pred), axis=0)
+    return loss
+
+
 def create_feature_map(features, feature_map_path):
     outfile = open(feature_map_path, 'w')
     for i, feat in enumerate(features):

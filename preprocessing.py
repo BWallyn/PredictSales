@@ -21,7 +21,7 @@ def preprocessing(data_sales, data_store, remove_outliers=False):
     data_sales['Date'] = pd.to_datetime(data_sales['Date'], format='%Y-%m-%d')
     # assume store open, if not provided
     data_sales.fillna(1, inplace=True)
-    # consider only open stores for training. Closed stores wont count into the score
+    # consider only open stores for training
     data_sales = data_sales[data_sales['Open'] != 0]
     # merge sales and store
     data = merge_data(data_sales, data_store, remove_outliers=remove_outliers)
